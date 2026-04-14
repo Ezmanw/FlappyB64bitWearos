@@ -178,8 +178,9 @@ class GameView extends View implements Choreographer.FrameCallback {
     private Random random = new Random();
     
     // UI Constants
-    private final float UI_MARGIN_HORIZONTAL_PERCENT = 0.025f;
+    private float UI_MARGIN_HORIZONTAL_PERCENT = 0.025f;
     private final float HOME_BUTTON_GAP_PERCENT = 0.05f;
+    private boolean isRoundScreen = false;
     private final float SETTINGS_BUTTON_SCALE_MULTIPLIER = 0.75f;
     private final float PIPE_GAP_BIRD_HEIGHT_MULTIPLIER = 2.2f;
     private final float SCORE_PANEL_NUMBER_SCALE_MULTIPLIER = 0.6f;
@@ -335,6 +336,10 @@ class GameView extends View implements Choreographer.FrameCallback {
     private void init(Context context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         highScore = prefs.getInt("highScore", 0);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            isRoundScreen = context.getResources().getConfiguration().isScreenRound();
+        }
 
         loadSettings();
 
@@ -512,12 +517,27 @@ class GameView extends View implements Choreographer.FrameCallback {
             return;
         }
 
-        if (!prefs.getBoolean(PREF_KEY_WARNING_SHOWN, false)) {
+        if (!prefs.getBoolean(PREF_KEY_WARNING_SHOWN, false) && !isRoundScreen) {
             float aspectRatio = (float) screenHeight / screenWidth;
             final float minAspectRatioThreshold = 1.7f;
             if (aspectRatio < minAspectRatioThreshold) {
                 showAspectRatioWarning();
             }
+        }
+
+        if (isRoundScreen) {
+            // Apply padding to ensure UI fits within the inscribed square of the circular screen.
+            // A square inscribed in a circle of diameter D has side length D / sqrt(2).
+            // Thus, the vertical/horizontal margin is (D - D/sqrt(2)) / 2 = D * (1 - 0.707) / 2 = D * 0.146.
+            int paddingX = (int) (screenWidth * 0.146f);
+            int paddingY = (int) (screenHeight * 0.146f);
+
+            // Apply top and bottom padding while preserving any existing system bar insets.
+            systemBarTop = Math.max(systemBarTop, paddingY);
+            systemBarBottom = Math.max(systemBarBottom, paddingY);
+
+            // Adjust the horizontal UI margin so UI elements fit within the inscribed width.
+            UI_MARGIN_HORIZONTAL_PERCENT = (float) paddingX / screenWidth;
         }
 
         scale = (float) getPlayableHeight() / unscaledBgDay.getHeight();
